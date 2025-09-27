@@ -1,0 +1,231 @@
+esphome:
+  name: node00
+  friendly_name: node00
+
+esp8266:
+  board: nodemcuv2
+  framework:
+    version: recommended
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password 
+  ap:
+    ssid: "EspRecoveryNode00"
+    password: "EspRecovery"
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  discovery: true
+  discovery_prefix: homeassistant
+  
+  on_message:
+    - topic: "node00/command"
+      payload: "status"
+      then:
+        - mqtt.publish:
+            topic: "node00/status"
+            payload: !lambda |-
+              char json[180];
+              time_t now = id(esptime).now().timestamp;
+              char time_str[20];
+              strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M", localtime(&now));
+
+              snprintf(json, sizeof(json),
+                "{\"online\":true,\"time\":\"%s\",\"ip\":\"%s\"}",
+                time_str,
+                id(my_ip).state.c_str());
+
+              return std::string(json);
+
+time:
+  - platform: sntp
+    id: esptime
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "ESP IP"
+      id: my_ip
+
+servo:
+  - id: small_blind_servo
+    output: out_small_blind_servo
+  - id: large_blind_servo
+    output: out_large_blind_servo
+
+output:
+  - platform: esp8266_pwm
+    id: out_small_blind_servo
+    pin: GPIO13
+    frequency: 50 Hz 
+
+  - platform: esp8266_pwm
+    id: out_large_blind_servo
+    pin: GPIO14
+    frequency: 50 Hz
+    
+cover:
+  - platform: template
+    name: "Small Blind"
+    id: small_blind_cover
+    command_topic: "node00/blinds/cover/small_blind/command"
+    state_topic: "node00/blinds/cover/small_blind/state"
+    optimistic: true
+    open_action:      
+      - number.set:
+          id: num_small_blind
+          value: 100
+      - delay: 21s
+      - number.set:
+          id: num_small_blind
+          value: 0
+      - servo.detach: small_blind_servo
+
+    stop_action:
+      - number.set:
+          id: num_small_blind
+          value: 0
+      - servo.detach: small_blind_servo
+
+    close_action:
+      - number.set:
+          id: num_small_blind
+          value: -100
+      - delay: 21s
+      - number.set:
+          id: num_small_blind
+          value: 0
+      - servo.detach: small_blind_servo
+
+  - platform: template
+    name: "Large Blind"
+    id: large_blind_cover
+    command_topic: "node00/blinds/cover/large_blind/command"
+    state_topic: "node00/blinds/cover/large_blind/state"
+    optimistic: true
+    open_action:      
+      - number.set:
+          id: num_large_blind
+          value: 100
+      - delay: 20s
+      - number.set:
+          id: num_large_blind
+          value: 0
+      - servo.detach: large_blind_servo
+
+    stop_action:
+      - number.set:
+          id: num_large_blind
+          value: 0
+      - servo.detach: large_blind_servo
+
+    close_action:
+      - number.set:
+          id: num_large_blind
+          value: -100
+      - delay: 20s
+      - number.set:
+          id: num_large_blind
+          value: 0
+      - servo.detach: large_blind_servo
+
+number:
+  - platform: template
+    name: "Small Blind Manual"
+    id: num_small_blind
+    min_value: -100
+    initial_value: 0
+    max_value: 100
+    step: 20
+    optimistic: true
+    command_topic: "node00/blinds/manual/small_blind/command"
+    state_topic: "node00/blinds/manual/small_blind/state"
+    set_action:
+      then:
+        - servo.write:
+            id: small_blind_servo
+            level: !lambda 'return x / 100.0;'
+
+  - platform: template
+    name: "Large Blind Manual"
+    id: num_large_blind
+    min_value: -100
+    initial_value: 0
+    max_value: 100
+    step: 20
+    optimistic: true
+    command_topic: "node00/blinds/manual/large_blind/command"
+    state_topic: "node00/blinds/manual/large_blind/state"
+    set_action:
+      then:
+        - servo.write:
+            id: large_blind_servo
+            level: !lambda 'return x / 100.0;'
+            
+remote_receiver:
+  pin:
+    number: GPIO04
+    inverted: true
+  dump: nec
+binary_sensor:
+  - platform: remote_receiver
+    name: "Blinds Small - Open"
+    nec:
+      address: 0xFF00
+      command: 0xBB44
+    on_press:
+      then:
+        - cover.open: small_blind_cover
+
+  - platform: remote_receiver
+    name: "Blinds Small - Close"
+    nec:
+      address: 0xFF00
+      command: 0xBF40
+    on_press:
+      then:
+        - cover.close: small_blind_cover
+
+  - platform: remote_receiver
+    name: "Blinds Small - Stop"
+    nec:
+      address: 0xFF00
+      command: 0xBC43
+    on_press:
+      then:
+        - cover.stop: small_blind_cover
+
+  - platform: remote_receiver
+    name: "Blinds Small - Manual Up"
+    nec:
+      address: 0xFF00
+      command: 0xEA15
+    on_press:
+      then:
+        - number.set:
+            id: num_small_blind
+            value: -100
+
+  - platform: remote_receiver
+    name: "Blinds Small - Manual Down"
+    nec:
+      address: 0xFF00
+      command: 0xF807
+    on_press:
+      then:
+        - number.set:
+            id: num_small_blind
+            value: 100
