@@ -1,4 +1,5 @@
-****ESPHome Node00 – Smart Blinds Controller****
+### ESPHome Node00 – Smart Blinds Controller
+
 This project contains an **ESPHome configuration** for an **ESP8266 (NodeMCU v2)** device that acts as a smart blinds controller. It is designed to be integrated into a smart home system via **MQTT** and/or the **ESPHome native API**, making it accessible through Home Assistant or any other MQTT-compatible platform.
 
 #### Features
@@ -58,9 +59,9 @@ This project contains an **ESPHome configuration** for an **ESP8266 (NodeMCU v2)
         
     *   Expose device state and status in a standardized format.
         
-*   Can be adapted to other servo-driven actuators such as curtains, valves, or custom mechanisms.
+    *   Can be adapted to other servo-driven actuators such as curtains, valves, or custom mechanisms.
+  
     
-
 #### Hardware Requirements
 
 *   ESP8266 NodeMCU v2 (or compatible).
